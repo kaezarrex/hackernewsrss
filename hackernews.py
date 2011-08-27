@@ -26,7 +26,7 @@ class HackerNewsHandler(webapp.RequestHandler):
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
         for i, url in enumerate(links):
-            pretty_page = self.article_cache.get(i)
+            pretty_page = self.article_cache.get(url)
             if pretty_page is None:
                 
                 try:
@@ -36,7 +36,7 @@ class HackerNewsHandler(webapp.RequestHandler):
                     
                 pretty_page = response['content']
                 
-                self.article_cache[i] = pretty_page
+                self.article_cache[url] = pretty_page
             
             if pretty_page is not None:
                 page = page.replace(descriptions[i], "<![CDATA[" + pretty_page + "]]>")
