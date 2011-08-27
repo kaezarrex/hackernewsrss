@@ -6,6 +6,8 @@ import re
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
+from viewtext import viewtext
+
 class HackerNewsHandler(webapp.RequestHandler):
 
     HTML_LINK_MATCH = re.compile('<link>(.+?)</link>')
@@ -22,17 +24,20 @@ class HackerNewsHandler(webapp.RequestHandler):
         links = re.findall(HackerNewsHandler.HTML_LINK_MATCH, page)[1:]
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
-        for i in range(len(links)):
-
-            if links[i] not in self.article_cache:
-
+        for i, url in enumerate(links):
+            pretty_page = self.article_cache.get(url)
+            if pretty_page is None:
                 try:
-                    pretty_page = urlfetch.fetch('http://viewtext.org/article?url=%s' % links[i], method=urlfetch.GET, deadline=10).content
-                    self.article_cache[links[i]] = pretty_page[pretty_page.find('<body>')+6:pretty_page.find('</body>')]
-                except urlfetch.DownloadError:
+                    response = viewtext(url)
+                except:
                     continue
-
-            page = page.replace(descriptions[i], "<![CDATA[" + self.article_cache[links[i]] + "]]>")
+                    
+                pretty_page = response['content']
+                
+                self.article_cache[url] = pretty_page
+            
+            if pretty_page is not None:
+                page = page.replace(descriptions[i], "<![CDATA[" + pretty_page + "]]>")
 
 
         self.response.headers['Content-Type'] = 'application/rss+xml'
