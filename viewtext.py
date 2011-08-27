@@ -32,10 +32,11 @@ def viewtext(url, redirect_links=False, mld=8):
             content = re.sub(r'\s+', ' ', content)
         if content is not None and len(content):
             content = re.sub(r'>\s+</', '></', content)
+            
         data['content'] = content
     
     return data
 
 if __name__ == '__main__':
-    page = viewtext('http://www.f-secure.com/weblog/archives/00002226.html')
+    page = viewtext('http://www.economist.com/node/21526782')
     print page['content']
