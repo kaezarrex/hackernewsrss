@@ -10,6 +10,7 @@ class HackerNewsHandler(webapp.RequestHandler):
 
     HTML_LINK_MATCH = re.compile('<link>(.+?)</link>')
     HTML_DESCRIPTION_MATCH = re.compile('<description>(.+?)</description>')
+    article_cache = {}
 
     def get(self):
 
@@ -23,14 +24,15 @@ class HackerNewsHandler(webapp.RequestHandler):
 
         for i in range(len(links)):
 
-            try:
-                pretty_page = urlfetch.fetch('http://viewtext.org/article?url=%s' % links[i], method=urlfetch.GET, deadline=10).content
-            except urlfetch.DownloadError:
-                return
+            if links[i] not in self.article_cache:
 
-            pretty_page = pretty_page[pretty_page.find('<body>')+6:pretty_page.find('</body>')]
+                try:
+                    pretty_page = urlfetch.fetch('http://viewtext.org/article?url=%s' % links[i], method=urlfetch.GET, deadline=10).content
+                    self.article_cache[links[i]] = pretty_page[pretty_page.find('<body>')+6:pretty_page.find('</body>')]
+                except urlfetch.DownloadError:
+                    continue
 
-            page = page.replace(descriptions[i], "<![CDATA[" + pretty_page + "]]>")
+            page = page.replace(descriptions[i], "<![CDATA[" + self.article_cache[links[i]] + "]]>")
 
 
         self.response.headers['Content-Type'] = 'application/rss+xml'
