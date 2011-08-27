@@ -19,7 +19,7 @@ def viewtext(url, redirect_links=False, mld=8):
 				)
 	url = 'http://viewtext.org/api/text?%s' % urlencode(args)
 
-	result = urlopen(url, timeout=10)
+	result = urlopen(url)
 	page = result.read()
 	page = page[2:-1] # chop off the callback bit
 	
