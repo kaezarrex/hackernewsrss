@@ -1,5 +1,6 @@
 from urllib2 import urlopen
 from urllib import urlencode
+import re
 
 try:
 	import simplejson as json
@@ -24,12 +25,15 @@ def viewtext(url, redirect_links=False, mld=8):
 	
 	data = json.loads(page)
 	del data['callback']
+	
+	content = data['content']
+	content = re.sub(r'\s+', ' ', content, flags=re.MULTILINE)
+	content = re.sub(r'>\s+</', '></', content, flags=re.MULTILINE)
+	
+	data['content'] = content
+	
 	return data
 
-def viewtext_clean(url):
-	return viewtext(url)
-
-
 if __name__ == '__main__':
-	page = viewtext_clean('http://www.f-secure.com/weblog/archives/00002226.html')
-	print page
+	page = viewtext('http://www.f-secure.com/weblog/archives/00002226.html')
+	print page['content']
