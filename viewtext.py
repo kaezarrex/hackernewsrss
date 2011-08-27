@@ -27,10 +27,12 @@ def viewtext(url, redirect_links=False, mld=8):
 	del data['callback']
 	
 	content = data['content']
-	content = re.sub(r'\s+', ' ', content, flags=re.MULTILINE)
-	content = re.sub(r'>\s+</', '></', content, flags=re.MULTILINE)
-	
-	data['content'] = content
+	if content is not None:
+	    if len(content):
+	        content = re.sub(r'\s+', ' ', content)
+    	if content is not None and len(content):
+    	    content = re.sub(r'>\s+</', '></', content)
+	    data['content'] = content
 	
 	return data
 

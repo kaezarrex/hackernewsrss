@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from google.appengine.api import urlfetch
 import re
+import urllib2
 
+from google.appengine.api import urlfetch
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 
@@ -25,16 +26,17 @@ class HackerNewsHandler(webapp.RequestHandler):
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
         for i, url in enumerate(links):
-            pretty_page = self.article_cache.get(url)
+            pretty_page = self.article_cache.get(i)
             if pretty_page is None:
+                
                 try:
                     response = viewtext(url)
-                except:
+                except urllib2.HTTPError:
                     continue
                     
                 pretty_page = response['content']
                 
-                self.article_cache[url] = pretty_page
+                self.article_cache[i] = pretty_page
             
             if pretty_page is not None:
                 page = page.replace(descriptions[i], "<![CDATA[" + pretty_page + "]]>")
