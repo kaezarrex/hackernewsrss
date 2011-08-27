@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from urllib2 import urlopen, URLError
+from google.appengine.api import urlfetch
 import re
 
 from google.appengine.ext import webapp
@@ -12,10 +12,10 @@ class HackerNewsHandler(webapp.RequestHandler):
     HTML_DESCRIPTION_MATCH = re.compile('<description>(.+?)</description>')
 
     def get(self):
-    
+
         try:
-            page = urlopen('http://feeds.feedburner.com/newsyc50?format=xml').read()
-        except URLError, e:
+            page = urlfetch.fetch('http://feeds.feedburner.com/newsyc50?format=xml', method=urlfetch.GET, deadline=10).content
+        except urlfetch.DownloadError:
             return
         
         links = re.findall(HackerNewsHandler.HTML_LINK_MATCH, page)[1:]
@@ -24,8 +24,8 @@ class HackerNewsHandler(webapp.RequestHandler):
         for i in range(len(links)):
 
             try:
-                pretty_page = urlopen('http://viewtext.org/article?url=' + links[i]).read()
-            except URLError, e:
+                pretty_page = urlfetch.fetch('http://viewtext.org/article?url=%s' % links[i], method=urlfetch.GET, deadline=10).content
+            except urlfetch.DownloadError:
                 return
 
             pretty_page = pretty_page[pretty_page.find('<body>')+6:pretty_page.find('</body>')]
