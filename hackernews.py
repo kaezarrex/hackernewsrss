@@ -2,6 +2,7 @@
 
 import re
 import urllib, urllib2
+from itertools import izip
 
 from xml.sax.saxutils import unescape
 
@@ -41,12 +42,15 @@ class HackerNewsHandler(webapp.RequestHandler):
         except urlfetch.DownloadError:
             return
         
+        # convert from latin-1 encoding to utf-8  
+        page = unicode(page, 'ISO-8859-1')
+        # chop off the useless feedburner header stylesheets
+        page = page[page.find('<rss'):]
+        
         links = re.findall(HackerNewsHandler.HTML_LINK_MATCH, page)[1:]
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
-        items = zip(links, descriptions)
-
-        for url, description in items:
+        for url, description in izip(links, descriptions):
             pretty_page = self.article_cache.get(url)
             if pretty_page is None:
                 
@@ -62,11 +66,12 @@ class HackerNewsHandler(webapp.RequestHandler):
             new_description = unescape(description) 
             
             if pretty_page is not None:
-                pretty_page = pretty_page.encode('ascii', 'xmlcharrefreplace')
                 new_description += '<br /><br />' + pretty_page
             
-            page = page.replace(description, u'<![CDATA[%s]]>' % new_description)
+            page = page.replace(description, '<![CDATA[%s]]>' % new_description)
 
+        # the original feed was ISO-8859-1, UTF-8 is better
+        self.response.out.write('<?xml version="1.0" encoding="UTF-8" ?>\n')
         self.response.out.write(page)
 
 class HackerNewsRSSHandler(HackerNewsHandler):
