@@ -2,6 +2,8 @@ from urllib2 import urlopen
 from urllib import urlencode
 import re
 
+from google.appengine.api import urlfetch
+
 try:
     import simplejson as json
 except:
@@ -19,8 +21,8 @@ def viewtext(url, redirect_links=False, mld=8):
                 )
     url = 'http://viewtext.org/api/text?%s' % urlencode(args)
 
-    result = urlopen(url)
-    page = result.read()
+    result = urlfetch.fetch(url, method=urlfetch.GET, deadline=10)
+    page = result.content
     page = page[2:-1] # chop off the callback bit
     
     data = json.loads(page)

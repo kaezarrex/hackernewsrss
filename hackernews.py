@@ -56,7 +56,7 @@ class HackerNewsHandler(webapp.RequestHandler):
                 
                 try:
                     response = viewtext(url)
-                except urllib2.HTTPError:
+                except urlfetch.DownloadError:
                     continue
                     
                 pretty_page = response['content']
