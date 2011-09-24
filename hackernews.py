@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-import re
-import urllib, urllib2
+import re, logging
 from itertools import izip
 
 from xml.sax.saxutils import unescape
@@ -17,7 +16,7 @@ HTML_CHAR_MATCH = re.compile(r'&#(\d+)(;|(?=\s))')
 def unescape_html(s):
     '''A simple function to unescape html
     Converts numeric character references (&#160;) to unicode charactrs
-    This will not work for entities such as &nbsp;    
+    This will not work for entities such as &nbsp;
     '''
 
     def _callback(matches):
@@ -26,14 +25,21 @@ def unescape_html(s):
             return unichr(int(id))
         except:
             return id
-    
+
     return HTML_CHAR_MATCH.sub(_callback, s)
+
+def extract_p(html):
+    pattern = re.compile(r'(<p>.*</p>)', re.DOTALL)
+    results = re.findall(pattern, html)
+    return ''.join(results)
 
 class HackerNewsHandler(webapp.RequestHandler):
 
     HTML_LINK_MATCH = re.compile('<link>(.+?)</link>')
     HTML_DESCRIPTION_MATCH = re.compile('<description>(.+?)</description>')
     article_cache = {}
+    url_queue = []
+    queue_length = 30
 
     def get(self):
 
@@ -41,33 +47,45 @@ class HackerNewsHandler(webapp.RequestHandler):
             page = urlfetch.fetch('http://feeds.feedburner.com/newsyc50?format=xml', method=urlfetch.GET, deadline=10).content
         except urlfetch.DownloadError:
             return
-        
-        # convert from latin-1 encoding to utf-8  
+
+        # convert from latin-1 encoding to utf-8
         page = unicode(page, 'ISO-8859-1')
         # chop off the useless feedburner header stylesheets
         page = page[page.find('<rss'):]
-        
+
         links = re.findall(HackerNewsHandler.HTML_LINK_MATCH, page)[1:]
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
         for url, description in izip(links, descriptions):
             pretty_page = self.article_cache.get(url)
             if pretty_page is None:
-                
+
                 try:
                     response = viewtext(url)
                 except urlfetch.DownloadError:
                     continue
-                    
-                pretty_page = response['content']
-                
-                self.article_cache[url] = pretty_page
 
-            new_description = unescape(description) 
-            
+                if not response:
+                    continue
+
+                pretty_page = response['content']
+
+                if pretty_page:
+                    pretty_page = extract_p(pretty_page)
+
+                self.article_cache[url] = pretty_page
+                self.url_queue.insert(0, url)
+
+                if len(self.url_queue) > self.queue_length:
+                    old_url = self.url_queue.pop()
+                    self.article_cache.pop(old_url)
+                    logging.debug('Popped %s' % old_url)
+
+            new_description = unescape(description)
+
             if pretty_page is not None:
                 new_description += '<br /><br />' + pretty_page
-            
+
             page = page.replace(description, '<![CDATA[%s]]>' % new_description)
 
         # the original feed was ISO-8859-1, UTF-8 is better
@@ -83,12 +101,12 @@ class HackerNewsXMLHandler(HackerNewsHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'application/xml'
         HackerNewsHandler.get(self)
-        
+
 def main():
     urls = [('/?', HackerNewsRSSHandler),
             ('/xml', HackerNewsXMLHandler)
             ]
-    
+
     application = webapp.WSGIApplication(urls, debug=True)
     util.run_wsgi_app(application)
 
