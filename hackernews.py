@@ -12,6 +12,7 @@ from google.appengine.ext.webapp import util
 from viewtext import viewtext
 
 HTML_CHAR_MATCH = re.compile(r'&#(\d+)(;|(?=\s))')
+FAVICON_URL = 'http://ycombinator.com/favicon.ico'
 
 def unescape_html(s):
     '''A simple function to unescape html
@@ -102,9 +103,14 @@ class HackerNewsXMLHandler(HackerNewsHandler):
         self.response.headers['Content-Type'] = 'application/xml'
         HackerNewsHandler.get(self)
 
+class FaviconHandler(webapp.RequestHandler):
+    def get(self):
+        self.redirect(FAVICON_URL, permanent=True)
+
 def main():
     urls = [('/?', HackerNewsRSSHandler),
-            ('/xml', HackerNewsXMLHandler)
+            ('/xml', HackerNewsXMLHandler),
+            ('/favicon.ico', FaviconHandler)
             ]
 
     application = webapp.WSGIApplication(urls, debug=True)
