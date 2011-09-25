@@ -77,10 +77,11 @@ class HackerNewsHandler(webapp.RequestHandler):
                 self.article_cache[url] = pretty_page
                 self.url_queue.insert(0, url)
 
-                if len(self.url_queue) > self.queue_length:
+                while len(self.url_queue) > self.queue_length:
                     old_url = self.url_queue.pop()
-                    self.article_cache.pop(old_url)
-                    logging.debug('Popped %s' % old_url)
+                    if old_url in self.article_cache:
+                        self.article_cache.pop(old_url)
+                        logging.debug('Popped %s' % old_url)
 
             new_description = unescape(description)
 
