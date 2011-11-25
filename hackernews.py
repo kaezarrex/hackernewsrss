@@ -6,7 +6,7 @@ from itertools import izip
 from xml.sax.saxutils import unescape
 
 from google.appengine.api import urlfetch
-from google.appengine.ext import webapp
+from google.appengine.ext import db, webapp
 from google.appengine.ext.webapp import util
 
 from viewtext import viewtext
@@ -34,58 +34,33 @@ def extract_p(html):
     results = re.findall(pattern, html)
     return ''.join(results)
 
+class Article(db.Model):
+    url = db.StringProperty(required=True)
+    content = db.TextProperty(required=True)
+
+
 class HackerNewsHandler(webapp.RequestHandler):
 
     HTML_LINK_MATCH = re.compile('<link>(.+?)</link>')
     HTML_DESCRIPTION_MATCH = re.compile('<description>(.+?)</description>')
-    article_cache = {}
     url_queue = []
     queue_length = 30
 
     def get(self):
 
-        try:
-            page = urlfetch.fetch('http://feeds.feedburner.com/newsyc50?format=xml', method=urlfetch.GET, deadline=10).content
-        except urlfetch.DownloadError:
-            return
+        page = self._get_feed('http://feeds.feedburner.com/newsyc50?format=xml')
 
-        # convert from latin-1 encoding to utf-8
-        page = unicode(page, 'ISO-8859-1')
-        # chop off the useless feedburner header stylesheets
-        page = page[page.find('<rss'):]
+        if not page:
+            return
 
         links = re.findall(HackerNewsHandler.HTML_LINK_MATCH, page)[1:]
         descriptions = re.findall(HackerNewsHandler.HTML_DESCRIPTION_MATCH, page)[1:]
 
         for url, description in izip(links, descriptions):
-            pretty_page = self.article_cache.get(url)
-            if pretty_page is None:
-
-                try:
-                    response = viewtext(url)
-                except urlfetch.DownloadError:
-                    continue
-
-                if not response:
-                    continue
-
-                pretty_page = response['content']
-
-                if pretty_page:
-                    pretty_page = extract_p(pretty_page)
-
-                self.article_cache[url] = pretty_page
-                self.url_queue.insert(0, url)
-
-                while len(self.url_queue) > self.queue_length:
-                    old_url = self.url_queue.pop()
-                    if old_url in self.article_cache:
-                        self.article_cache.pop(old_url)
-                        logging.debug('Popped %s' % old_url)
-
             new_description = unescape(description)
+            pretty_page = self._get_article(url)
 
-            if pretty_page is not None:
+            if pretty_page:
                 new_description += '<br /><br />' + pretty_page
 
             page = page.replace(description, '<![CDATA[%s]]>' % new_description)
@@ -94,19 +69,74 @@ class HackerNewsHandler(webapp.RequestHandler):
         self.response.out.write('<?xml version="1.0" encoding="UTF-8" ?>\n')
         self.response.out.write(page)
 
+    @staticmethod
+    def _get_feed(url):
+        try:
+            page = urlfetch.fetch(url, method=urlfetch.GET, deadline=10).content
+        except urlfetch.DownloadError:
+            return None
+
+        # convert from latin-1 encoding to utf-8
+        page = unicode(page, 'ISO-8859-1')
+        # chop off the useless feedburner header stylesheets
+        page = page[page.find('<rss'):]
+
+        return page
+
+    @staticmethod
+    def _get_article(url):
+
+        query = db.Query(Article)
+        query = query.filter('url = ', url)
+        article = query.get()
+
+        if article is None:
+
+            try:
+                response = viewtext(url)
+            except urlfetch.DownloadError:
+                return None
+
+            if not response:
+                return None
+
+            pretty_page = response['content']
+
+            if pretty_page:
+                pretty_page = extract_p(pretty_page)
+
+            if not pretty_page:
+                return None
+
+            article = Article(url=url, content=pretty_page)
+            article.put()
+
+            #self.url_queue.insert(0, url)
+            #while len(self.url_queue) > self.queue_length:
+            #    old_url = self.url_queue.pop()
+            #    if old_url in self.article_cache:
+            #        self.article_cache.pop(old_url)
+            #        logging.debug('Popped %s' % old_url)
+
+        return article.content
+
+
 class HackerNewsRSSHandler(HackerNewsHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'application/rss+xml'
         HackerNewsHandler.get(self)
+
 
 class HackerNewsXMLHandler(HackerNewsHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'application/xml'
         HackerNewsHandler.get(self)
 
+
 class FaviconHandler(webapp.RequestHandler):
     def get(self):
         self.redirect(FAVICON_URL, permanent=True)
+
 
 def main():
     urls = [('/?', HackerNewsRSSHandler),
