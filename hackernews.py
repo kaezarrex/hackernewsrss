@@ -4,12 +4,14 @@ import re, logging
 from itertools import izip
 
 from xml.sax.saxutils import unescape
+from lxml import html as lxml_html
 
 from google.appengine.api import urlfetch
-from google.appengine.ext import db, webapp
+from google.appengine.ext import db
 from google.appengine.ext.webapp import util
+import webapp2
 
-from viewtext import viewtext
+from instapaper import instapaper
 
 HTML_CHAR_MATCH = re.compile(r'&#(\d+)(;|(?=\s))')
 FAVICON_URL = 'http://ycombinator.com/favicon.ico'
@@ -34,12 +36,17 @@ def extract_p(html):
     results = re.findall(pattern, html)
     return ''.join(results)
 
+def extract_story(html):
+    root = lxml_html.document_fromstring(html)
+    story = root.get_element_by_id('story')
+    return lxml_html.tostring(story)
+
 class Article(db.Model):
     url = db.StringProperty(required=True)
     content = db.TextProperty(required=True)
 
 
-class HackerNewsHandler(webapp.RequestHandler):
+class HackerNewsHandler(webapp2.RequestHandler):
 
     HTML_LINK_MATCH = re.compile('<link>(.+?)</link>')
     HTML_DESCRIPTION_MATCH = re.compile('<description>(.+?)</description>')
@@ -93,30 +100,20 @@ class HackerNewsHandler(webapp.RequestHandler):
         if article is None:
 
             try:
-                response = viewtext(url)
+                response = instapaper(url)
             except urlfetch.DownloadError:
                 return None
 
             if not response:
                 return None
 
-            pretty_page = response['content']
-
-            if pretty_page:
-                pretty_page = extract_p(pretty_page)
+            pretty_page = extract_story(response)
 
             if not pretty_page:
                 return None
 
             article = Article(url=url, content=pretty_page)
             article.put()
-
-            #self.url_queue.insert(0, url)
-            #while len(self.url_queue) > self.queue_length:
-            #    old_url = self.url_queue.pop()
-            #    if old_url in self.article_cache:
-            #        self.article_cache.pop(old_url)
-            #        logging.debug('Popped %s' % old_url)
 
         return article.content
 
@@ -133,20 +130,15 @@ class HackerNewsXMLHandler(HackerNewsHandler):
         HackerNewsHandler.get(self)
 
 
-class FaviconHandler(webapp.RequestHandler):
+class FaviconHandler(webapp2.RequestHandler):
     def get(self):
         self.redirect(FAVICON_URL, permanent=True)
 
 
-def main():
-    urls = [('/?', HackerNewsRSSHandler),
-            ('/xml', HackerNewsXMLHandler),
-            ('/favicon.ico', FaviconHandler)
-            ]
 
-    application = webapp.WSGIApplication(urls, debug=True)
-    util.run_wsgi_app(application)
+urls = [('/?', HackerNewsRSSHandler),
+        ('/xml', HackerNewsXMLHandler),
+        ('/favicon.ico', FaviconHandler)
+        ]
 
-
-if __name__ == '__main__':
-    main()
+app = webapp2.WSGIApplication(urls)
