@@ -3,7 +3,7 @@ import os
 import re
 from xml.sax.saxutils import unescape
 
-from flask import Flask, Response
+from flask import Flask, Response, send_from_directory
 import requests
 
 from viewtext import viewtext
@@ -70,6 +70,12 @@ def index():
 def xml():
 
     return Response(main(), mimetype='text/xml')
+
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 
 def main():
