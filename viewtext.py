@@ -1,8 +1,7 @@
-from urllib2 import urlopen
 from urllib import urlencode
-import re, logging
+import re
 
-from google.appengine.api import urlfetch
+import requests
 
 try:
     import simplejson as json
@@ -21,11 +20,12 @@ def viewtext(url, redirect_links=False, mld=8):
                 )
     url = 'http://viewtext.org/api/text?%s' % urlencode(args)
 
-    result = urlfetch.fetch(url, method=urlfetch.GET, deadline=10)
+    result = requests.get(url)
+
     if result.status_code != 200:
-        logging.warn('[%s] %s' % (result.status_code, url))
         return None
-    page = result.content
+
+    page = result.text
     page = page[2:-1] # chop off the callback bit
 
     data = json.loads(page)
